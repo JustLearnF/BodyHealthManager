@@ -59,29 +59,56 @@ class _WeightPageState extends State<WeightPage> {
 
   @override
   Widget build(BuildContext context) {
-    // 读取时将原始物理 key 保存起来，防止错位
-    final data = [];
+    // 1. 读取原始记录
+    final List<Map<String, dynamic>> allRecords = [];
     for (int i = 0; i < box.length; i++) {
       final item = Map<String, dynamic>.from(box.getAt(i));
       item['key'] = box.keyAt(i);
-      data.add(item);
+      allRecords.add(item);
     }
 
-    // 【修改】：截取最近15次记录用于折线图绘制
-    final recentData = data.length > 15 ? data.sublist(data.length - 15) : data;
+    // 2. 按日期分组
+    final Map<String, List<Map<String, dynamic>>> grouped = {};
+    for (var item in allRecords) {
+      final String dateKey = DateFormat('yyyy-MM-dd').format(DateTime.parse(item['time']));
+      grouped.putIfAbsent(dateKey, () => []);
+      grouped[dateKey]!.add(item);
+    }
+
+    // 获取排序后的日期列表
+    final sortedDates = grouped.keys.toList()..sort((a, b) => a.compareTo(b));
+
+    // 3. 计算每日最低体重用于折线图绘制
+    final List<Map<String, dynamic>> dailyMinData = sortedDates.map((date) {
+      final dayItems = grouped[date]!;
+      final minWeight = dayItems
+          .map((e) => (e['weight'] as num).toDouble())
+          .reduce((a, b) => a < b ? a : b);
+      return {
+        'date': date,
+        'weight': minWeight,
+      };
+    }).toList();
+
+    // 截取最近15天的最低点用于展示
+    final recentChartData = dailyMinData.length > 15
+        ? dailyMinData.sublist(dailyMinData.length - 15)
+        : dailyMinData;
 
     List<LineChartBarData> lines = [];
-    for (int i = 1; i < recentData.length; i++) {
-      final p = (recentData[i - 1]['weight'] as num).toDouble();
-      final n = (recentData[i]['weight'] as num).toDouble();
+    for (int i = 1; i < recentChartData.length; i++) {
+      final p = recentChartData[i - 1]['weight'] as double;
+      final n = recentChartData[i]['weight'] as double;
       lines.add(LineChartBarData(
         spots: [FlSpot((i - 1).toDouble(), p), FlSpot(i.toDouble(), n)],
         color: n >= p ? Colors.red : Colors.green,
         barWidth: 4,
+        dotData: const FlDotData(show: true),
       ));
     }
 
     return Column(children: [
+      // 输入区
       Padding(
         padding: const EdgeInsets.all(12),
         child: Row(children: [
@@ -109,12 +136,13 @@ class _WeightPageState extends State<WeightPage> {
           )
         ]),
       ),
+      // 图表区 (展示每日最低点)
       SizedBox(
-        height: 250,
-        child: recentData.length < 2
-            ? const Center(child: Text('至少两条记录'))
+        height: 200,
+        child: recentChartData.length < 2
+            ? const Center(child: Text('记录多天数据以查看最低体重趋势'))
             : Padding(
-          padding: const EdgeInsets.only(right: 20, top: 10),
+          padding: const EdgeInsets.only(right: 20, top: 10, left: 10),
           child: LineChart(LineChartData(
             lineBarsData: lines,
             titlesData: FlTitlesData(
@@ -123,15 +151,14 @@ class _WeightPageState extends State<WeightPage> {
               bottomTitles: AxisTitles(
                 sideTitles: SideTitles(
                   showTitles: true,
+                  reservedSize: 30,
                   getTitlesWidget: (value, meta) {
                     int i = value.toInt();
-                    if (i < 0 || i >= recentData.length) return const SizedBox();
-                    final dt = DateTime.parse(recentData[i]['time']);
+                    if (i < 0 || i >= recentChartData.length) return const SizedBox();
+                    final dateStr = recentChartData[i]['date'].toString().substring(5); // 截取 MM-dd
                     return SideTitleWidget(
                       axisSide: meta.axisSide,
-                      child: Text(DateFormat('MM-dd\nHH:mm').format(dt),
-                          style: const TextStyle(fontSize: 9),
-                          textAlign: TextAlign.center),
+                      child: Text(dateStr, style: const TextStyle(fontSize: 9)),
                     );
                   },
                 ),
@@ -140,56 +167,66 @@ class _WeightPageState extends State<WeightPage> {
           )),
         ),
       ),
+      const Divider(),
+      // 历史记录列表 (按天分组)
       Expanded(
-        child: ListView.builder(
-          itemCount: data.length,
-          itemBuilder: (cxt, i) {
-            final item = data[i];
-            return ListTile(
-              title: Text('${item["weight"]}斤'),
-              subtitle: Text(DateFormat('yyyy-MM-dd HH:mm')
-                  .format(DateTime.parse(item['time']))),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                      icon: const Icon(Icons.edit),
-                      onPressed: () {
-                        final ec = TextEditingController(text: item['weight'].toString());
-                        showDialog(
-                            context: context,
-                            builder: (_) => AlertDialog(
-                              content: TextField(
-                                controller: ec,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              ),
-                              actions: [
-                                TextButton(
-                                    onPressed: () {
-                                      if (ec.text.isEmpty) return;
-                                      // 使用精确的 key 更新
-                                      box.put(item['key'], {
-                                        ...item,
-                                        'weight': double.parse(ec.text)
-                                      });
-                                      Navigator.pop(context);
-                                      setState(() {});
-                                    },
-                                    child: const Text('保存'))
-                              ],
-                            ));
-                      }),
-                  IconButton(
-                      icon: const Icon(Icons.delete),
-                      onPressed: () {
-                        // 使用精确的 key 删除
-                        box.delete(item['key']);
-                        setState(() {});
-                      })
-                ],
-              ),
+        child: ListView(
+          children: sortedDates.reversed.map((date) {
+            final items = grouped[date]!;
+            final dayMin = items.map((e) => (e['weight'] as num).toDouble()).reduce((a, b) => a < b ? a : b);
+
+            return ExpansionTile(
+              title: Text(date, style: const TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text('记录 ${items.length} 次 | 当天最低: $dayMin 斤'),
+              initiallyExpanded: date == sortedDates.last, // 默认展开今天
+              children: items.reversed.map((item) {
+                return ListTile(
+                  dense: true,
+                  title: Text('${item["weight"]} 斤'),
+                  subtitle: Text(DateFormat('HH:mm').format(DateTime.parse(item['time']))),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                          icon: const Icon(Icons.edit, size: 20),
+                          onPressed: () {
+                            final ec = TextEditingController(text: item['weight'].toString());
+                            showDialog(
+                                context: context,
+                                builder: (_) => AlertDialog(
+                                  title: const Text('修改体重'),
+                                  content: TextField(
+                                    controller: ec,
+                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  ),
+                                  actions: [
+                                    TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+                                    TextButton(
+                                        onPressed: () {
+                                          if (ec.text.isEmpty) return;
+                                          box.put(item['key'], {
+                                            ...item,
+                                            'weight': double.parse(ec.text)
+                                          });
+                                          Navigator.pop(context);
+                                          setState(() {});
+                                        },
+                                        child: const Text('保存'))
+                                  ],
+                                ));
+                          }),
+                      IconButton(
+                          icon: const Icon(Icons.delete, size: 20),
+                          onPressed: () {
+                            box.delete(item['key']);
+                            setState(() {});
+                          })
+                    ],
+                  ),
+                );
+              }).toList(),
             );
-          },
+          }).toList(),
         ),
       )
     ]);
@@ -227,9 +264,7 @@ class _FoodPageState extends State<FoodPage> {
 
     final Map<String, List<Map<String, dynamic>>> grouped = {};
     for (final r in records) {
-      // 【修复核心】：如果数据库里的旧数据没有 'date' 字段，提供一个默认值，防止 Null 崩溃
       final String dateKey = r['date']?.toString() ?? '未知日期';
-
       grouped.putIfAbsent(dateKey, () => []);
       grouped[dateKey]!.add(r);
     }
