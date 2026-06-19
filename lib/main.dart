@@ -9,6 +9,7 @@ Future<void> main() async {
   await Hive.initFlutter();
   await Hive.openBox('weight');
   await Hive.openBox('food');
+  await Hive.openBox('exercise');
   runApp(const MyApp());
 }
 
@@ -29,13 +30,21 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('健康记录'),
-          bottom: const TabBar(tabs: [Tab(text: '体重'), Tab(text: '食量')]),
+          bottom: const TabBar(tabs: [
+            Tab(text: '体重'),
+            Tab(text: '食量'),
+            Tab(text: '运动'),
+          ]),
         ),
-        body: const TabBarView(children: [WeightPage(), FoodPage()]),
+        body: const TabBarView(children: [
+          WeightPage(),
+          FoodPage(),
+          ExercisePage(),
+        ]),
       ),
     );
   }
@@ -348,6 +357,147 @@ class _FoodPageState extends State<FoodPage> {
                                             ...item,
                                             'food': fc.text,
                                             'amount': int.parse(ac.text)
+                                          });
+                                          Navigator.pop(context);
+                                          setState(() {});
+                                        },
+                                        child: const Text('保存'))
+                                  ],
+                                ));
+                          }),
+                      IconButton(
+                          icon: const Icon(Icons.delete),
+                          onPressed: () {
+                            box.delete(item['key']);
+                            setState(() {});
+                          })
+                    ],
+                  ),
+                );
+              }).toList(),
+            );
+          }).toList(),
+        ),
+      )
+    ]);
+  }
+}
+
+class ExercisePage extends StatefulWidget {
+  const ExercisePage({super.key});
+  @override
+  State<ExercisePage> createState() => _ExercisePageState();
+}
+
+class _ExercisePageState extends State<ExercisePage> {
+  final exercise = TextEditingController();
+  final value = TextEditingController();
+  final units = ['组', '个', 'KM', '分钟'];
+  String unit = '组';
+  Box get box => Hive.box('exercise');
+
+  @override
+  void dispose() {
+    exercise.dispose();
+    value.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final records = [];
+    for (int i = 0; i < box.length; i++) {
+      final item = Map<String, dynamic>.from(box.getAt(i));
+      item['key'] = box.keyAt(i);
+      records.add(item);
+    }
+
+    final Map<String, List<Map<String, dynamic>>> grouped = {};
+    for (final r in records) {
+      final String dateKey = r['date']?.toString() ?? '未知日期';
+      grouped.putIfAbsent(dateKey, () => []);
+      grouped[dateKey]!.add(r);
+    }
+
+    final dates = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
+
+    return Column(children: [
+      Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(children: [
+          TextField(controller: exercise, decoration: const InputDecoration(labelText: '运动类型')),
+          TextField(controller: value, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: '数值')),
+          const SizedBox(height: 8),
+          const Align(alignment: Alignment.centerLeft, child: Text('单位:', style: TextStyle(color: Colors.grey))),
+          SizedBox(
+            height: 80,
+            child: CupertinoPicker(
+              itemExtent: 35,
+              onSelectedItemChanged: (i) {
+                setState(() {
+                  unit = units[i];
+                });
+              },
+              children: units.map((e) => Center(child: Text(e))).toList(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          FilledButton(
+            onPressed: () {
+              if (exercise.text.isEmpty || value.text.isEmpty) return;
+              box.add({
+                'id': DateTime.now().microsecondsSinceEpoch.toString(),
+                'exercise': exercise.text,
+                'value': value.text,
+                'unit': unit,
+                'date': DateFormat('yyyy-MM-dd').format(DateTime.now())
+              });
+              exercise.clear();
+              value.clear();
+              setState(() {});
+            },
+            child: const Text('保存'),
+          )
+        ]),
+      ),
+      Expanded(
+        child: ListView(
+          children: dates.map((d) {
+            final items = grouped[d]!;
+            return ExpansionTile(
+              title: Text(d, style: const TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text('共 ${items.length} 项'),
+              initiallyExpanded: true,
+              children: items.map((item) {
+                return ListTile(
+                  title: Text(item['exercise'] ?? '未知运动'),
+                  subtitle: Text('${item["value"] ?? 0} ${item["unit"] ?? ""}'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                          icon: const Icon(Icons.edit),
+                          onPressed: () {
+                            final ec = TextEditingController(text: item['exercise']);
+                            final vc = TextEditingController(text: item['value']?.toString() ?? '0');
+                            showDialog(
+                                context: context,
+                                builder: (_) => AlertDialog(
+                                  content: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      TextField(controller: ec, decoration: const InputDecoration(labelText: '运动类型')),
+                                      TextField(controller: vc, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: '数值'))
+                                    ],
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                        onPressed: () {
+                                          if (ec.text.isEmpty || vc.text.isEmpty) return;
+                                          box.put(item['key'], {
+                                            ...item,
+                                            'exercise': ec.text,
+                                            'value': vc.text
                                           });
                                           Navigator.pop(context);
                                           setState(() {});
