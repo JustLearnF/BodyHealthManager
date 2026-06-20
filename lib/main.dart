@@ -184,7 +184,7 @@ class _WeightPageState extends State<WeightPage> {
       ),
       // 图表区 (展示每日最低点)
       SizedBox(
-        height: 200,
+        height: 250,
         child: recentChartData.length < 2
             ? const Center(child: Text('记录多天数据以查看最低体重趋势'))
             : Padding(
