@@ -159,6 +159,7 @@ class _WeightPageState extends State<WeightPage> {
               topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
               bottomTitles: AxisTitles(
                 sideTitles: SideTitles(
+                  interval: 1,
                   showTitles: true,
                   reservedSize: 30,
                   getTitlesWidget: (value, meta) {
@@ -278,7 +279,7 @@ class _FoodPageState extends State<FoodPage> {
       grouped[dateKey]!.add(r);
     }
 
-    final dates = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
+    final dates = grouped.keys.toList()..sort((a, b) => a.compareTo(b));
 
     return Column(children: [
       Padding(
@@ -321,12 +322,12 @@ class _FoodPageState extends State<FoodPage> {
       ),
       Expanded(
         child: ListView(
-          children: dates.map((d) {
+          children: dates.reversed.map((d) {
             final items = grouped[d]!;
             return ExpansionTile(
               title: Text(d, style: const TextStyle(fontWeight: FontWeight.bold)),
               subtitle: Text('共 ${items.length} 项'),
-              initiallyExpanded: true,
+              initiallyExpanded: d == dates.last,
               children: items.map((item) {
                 return ListTile(
                   title: Text(item['food'] ?? '未知食物'),
@@ -419,7 +420,7 @@ class _ExercisePageState extends State<ExercisePage> {
       grouped[dateKey]!.add(r);
     }
 
-    final dates = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
+    final dates = grouped.keys.toList()..sort((a, b) => a.compareTo(b));
 
     return Column(children: [
       Padding(
@@ -462,12 +463,12 @@ class _ExercisePageState extends State<ExercisePage> {
       ),
       Expanded(
         child: ListView(
-          children: dates.map((d) {
+          children: dates.reversed.map((d) {
             final items = grouped[d]!;
             return ExpansionTile(
               title: Text(d, style: const TextStyle(fontWeight: FontWeight.bold)),
               subtitle: Text('共 ${items.length} 项'),
-              initiallyExpanded: true,
+              initiallyExpanded: d == dates.last,
               children: items.map((item) {
                 return ListTile(
                   title: Text(item['exercise'] ?? '未知运动'),
