@@ -1,8 +1,12 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,6 +31,35 @@ class MyApp extends StatelessWidget {
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
+
+  Future<void> exportData(BuildContext context) async {
+    final boxes = ['weight', 'food', 'exercise'];
+
+    final status = await Permission.storage.request();
+    if(!status.isGranted) {
+      await Permission.manageExternalStorage.request();
+    }
+
+    for(final boxName in boxes) {
+      final box = Hive.box(boxName);
+      final List<Map<String, dynamic>> allRecords = [];
+      for (int i = 0; i < box.length; i++) {
+        final item = Map<String, dynamic>.from(box.getAt(i));
+        item['key'] = box.keyAt(i);
+        allRecords.add(item);
+      }
+
+      final json = const JsonEncoder.withIndent(' ').convert(allRecords);
+      final date = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+      final file = File('/storage/emulated/0/Download/${boxName}_$date.json');
+
+      await file.writeAsString(json);
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('已导出数据'), duration: Duration(seconds: 2),));
+    return;
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -39,6 +72,9 @@ class HomePage extends StatelessWidget {
             Tab(text: '食量'),
             Tab(text: '运动'),
           ]),
+          actions: [
+            IconButton(onPressed: () => exportData(context), icon: const Icon(Icons.drive_folder_upload,size: 20, color: const Color(0x10000000),))
+          ],
         ),
         body: const TabBarView(children: [
           WeightPage(),
