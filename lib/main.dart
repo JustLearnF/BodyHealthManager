@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
@@ -299,6 +300,16 @@ class _FoodPageState extends State<FoodPage> {
     super.dispose();
   }
 
+  void copyDataToClip(BuildContext context, List<Map<String, dynamic>> items) {
+    String finalStr = '';
+    for(final item in items) {
+      finalStr = finalStr + item['food'].toString() + item['amount'].toString() + item['unit'].toString() + '+';
+    }
+    Clipboard.setData(ClipboardData(text: finalStr));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('已复制数据'), duration: Duration(seconds: 2),));
+    return;
+  }
+
   @override
   Widget build(BuildContext context) {
     final records = [];
@@ -360,58 +371,62 @@ class _FoodPageState extends State<FoodPage> {
         child: ListView(
           children: dates.reversed.map((d) {
             final items = grouped[d]!;
-            return ExpansionTile(
-              title: Text(d, style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text('共 ${items.length} 项'),
-              initiallyExpanded: d == dates.last,
-              children: items.map((item) {
-                return ListTile(
-                  title: Text(item['food'] ?? '未知食物'),
-                  subtitle: Text('${item["amount"] ?? 0} ${item["unit"] ?? "g"}'),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                          icon: const Icon(Icons.edit),
-                          onPressed: () {
-                            final fc = TextEditingController(text: item['food']);
-                            final ac = TextEditingController(text: item['amount']?.toString() ?? '0');
-                            showDialog(
-                                context: context,
-                                builder: (_) => AlertDialog(
-                                  content: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      TextField(controller: fc, decoration: const InputDecoration(labelText: '食物名称')),
-                                      TextField(controller: ac, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: '数量'))
+            return GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onLongPress: () => copyDataToClip(context, items),
+              child: ExpansionTile(
+                title: Text(d, style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text('共 ${items.length} 项'),
+                initiallyExpanded: d == dates.last,
+                children: items.map((item) {
+                  return ListTile(
+                    title: Text(item['food'] ?? '未知食物'),
+                    subtitle: Text('${item["amount"] ?? 0} ${item["unit"] ?? "g"}'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                            icon: const Icon(Icons.edit),
+                            onPressed: () {
+                              final fc = TextEditingController(text: item['food']);
+                              final ac = TextEditingController(text: item['amount']?.toString() ?? '0');
+                              showDialog(
+                                  context: context,
+                                  builder: (_) => AlertDialog(
+                                    content: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        TextField(controller: fc, decoration: const InputDecoration(labelText: '食物名称')),
+                                        TextField(controller: ac, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: '数量'))
+                                      ],
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                          onPressed: () {
+                                            if (fc.text.isEmpty || ac.text.isEmpty) return;
+                                            box.put(item['key'], {
+                                              ...item,
+                                              'food': fc.text,
+                                              'amount': int.parse(ac.text)
+                                            });
+                                            Navigator.pop(context);
+                                            setState(() {});
+                                          },
+                                          child: const Text('保存'))
                                     ],
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                        onPressed: () {
-                                          if (fc.text.isEmpty || ac.text.isEmpty) return;
-                                          box.put(item['key'], {
-                                            ...item,
-                                            'food': fc.text,
-                                            'amount': int.parse(ac.text)
-                                          });
-                                          Navigator.pop(context);
-                                          setState(() {});
-                                        },
-                                        child: const Text('保存'))
-                                  ],
-                                ));
-                          }),
-                      IconButton(
-                          icon: const Icon(Icons.delete),
-                          onPressed: () {
-                            box.delete(item['key']);
-                            setState(() {});
-                          })
-                    ],
-                  ),
-                );
-              }).toList(),
+                                  ));
+                            }),
+                        IconButton(
+                            icon: const Icon(Icons.delete),
+                            onPressed: () {
+                              box.delete(item['key']);
+                              setState(() {});
+                            })
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
             );
           }).toList(),
         ),
@@ -438,6 +453,16 @@ class _ExercisePageState extends State<ExercisePage> {
     exercise.dispose();
     value.dispose();
     super.dispose();
+  }
+
+  void copyDataToClip(BuildContext context, List<Map<String, dynamic>> items) {
+    String finalStr = '';
+    for(final item in items) {
+      finalStr = finalStr + item['exercise'].toString() + item['value'].toString() + item['unit'].toString() + '+';
+    }
+    Clipboard.setData(ClipboardData(text: finalStr));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('已复制数据'), duration: Duration(seconds: 2),));
+    return;
   }
 
   @override
@@ -501,58 +526,62 @@ class _ExercisePageState extends State<ExercisePage> {
         child: ListView(
           children: dates.reversed.map((d) {
             final items = grouped[d]!;
-            return ExpansionTile(
-              title: Text(d, style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text('共 ${items.length} 项'),
-              initiallyExpanded: d == dates.last,
-              children: items.map((item) {
-                return ListTile(
-                  title: Text(item['exercise'] ?? '未知运动'),
-                  subtitle: Text('${item["value"] ?? 0} ${item["unit"] ?? ""}'),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                          icon: const Icon(Icons.edit),
-                          onPressed: () {
-                            final ec = TextEditingController(text: item['exercise']);
-                            final vc = TextEditingController(text: item['value']?.toString() ?? '0');
-                            showDialog(
-                                context: context,
-                                builder: (_) => AlertDialog(
-                                  content: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      TextField(controller: ec, decoration: const InputDecoration(labelText: '运动类型')),
-                                      TextField(controller: vc, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: '数值'))
+            return GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onLongPress: () => copyDataToClip(context, items),
+              child: ExpansionTile(
+                title: Text(d, style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text('共 ${items.length} 项'),
+                initiallyExpanded: d == dates.last,
+                children: items.map((item) {
+                  return ListTile(
+                    title: Text(item['exercise'] ?? '未知运动'),
+                    subtitle: Text('${item["value"] ?? 0} ${item["unit"] ?? ""}'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                            icon: const Icon(Icons.edit),
+                            onPressed: () {
+                              final ec = TextEditingController(text: item['exercise']);
+                              final vc = TextEditingController(text: item['value']?.toString() ?? '0');
+                              showDialog(
+                                  context: context,
+                                  builder: (_) => AlertDialog(
+                                    content: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        TextField(controller: ec, decoration: const InputDecoration(labelText: '运动类型')),
+                                        TextField(controller: vc, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: '数值'))
+                                      ],
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                          onPressed: () {
+                                            if (ec.text.isEmpty || vc.text.isEmpty) return;
+                                            box.put(item['key'], {
+                                              ...item,
+                                              'exercise': ec.text,
+                                              'value': vc.text
+                                            });
+                                            Navigator.pop(context);
+                                            setState(() {});
+                                          },
+                                          child: const Text('保存'))
                                     ],
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                        onPressed: () {
-                                          if (ec.text.isEmpty || vc.text.isEmpty) return;
-                                          box.put(item['key'], {
-                                            ...item,
-                                            'exercise': ec.text,
-                                            'value': vc.text
-                                          });
-                                          Navigator.pop(context);
-                                          setState(() {});
-                                        },
-                                        child: const Text('保存'))
-                                  ],
-                                ));
-                          }),
-                      IconButton(
-                          icon: const Icon(Icons.delete),
-                          onPressed: () {
-                            box.delete(item['key']);
-                            setState(() {});
-                          })
-                    ],
-                  ),
-                );
-              }).toList(),
+                                  ));
+                            }),
+                        IconButton(
+                            icon: const Icon(Icons.delete),
+                            onPressed: () {
+                              box.delete(item['key']);
+                              setState(() {});
+                            })
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
             );
           }).toList(),
         ),
